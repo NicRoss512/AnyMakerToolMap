@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Anymaker — карта сейва и поиск запчастей</title>
+<style>
+  :root{--bg:#12161c;--panel:#1b212b;--line:#2c3543;--txt:#dfe6ef;--dim:#8b98a9;--acc:#4ea3ff;--ok:#4ad07a;--hot:#3dff6e;--all:#00e5d6}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  #app{display:flex;height:100%;overflow:hidden}
+  #side{width:372px;min-width:372px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:12px 14px}
+  #main{flex:1;position:relative;overflow:hidden}
+  #app.nos #side{display:none}
+  #bSide{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:6;width:24px;height:52px;
+         background:var(--panel);border:1px solid var(--line);border-left:none;
+         border-radius:0 6px 6px 0;color:var(--dim);font-size:14px;cursor:pointer;padding:0}
+  #bSide:hover{color:var(--acc);border-color:var(--acc)}
+  .hdr{display:flex;align-items:center;gap:8px}
+  .hdr h1{flex:1}
+  .hdr select{width:auto;padding:2px 4px;font-size:12px}
+  .pp{display:flex;gap:6px;align-items:center;padding:2px 6px;font-size:11.5px;cursor:pointer;
+      font-variant-numeric:tabular-nums;white-space:nowrap;border-top:1px solid var(--line)}
+  .pp:hover{background:#1a2230}
+  .pp b{color:#ffc400;font-weight:600;min-width:22px}
+  .pp span{color:var(--dim)}
+  .pp u{margin-left:auto;color:var(--hot);text-decoration:none}
+  canvas{display:block;background:#0b0e13;cursor:crosshair}
+  h1{font-size:15px;margin:0 0 3px}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);
+     margin:16px 0 7px;border-bottom:1px solid var(--line);padding-bottom:4px}
+  small,p{color:var(--dim);margin:4px 0}
+  .row{display:flex;gap:5px;align-items:center;margin:5px 0}
+  label{color:var(--dim);min-width:88px;font-size:12px}
+  input[type=text],input[type=number],select{background:#11161d;color:var(--txt);border:1px solid var(--line);
+    border-radius:4px;padding:4px 6px;font-size:12px;flex:1;min-width:0}
+  input[type=range]{flex:1;min-width:0}
+  button{background:#243040;color:var(--txt);border:1px solid var(--line);border-radius:4px;
+    padding:5px 8px;font-size:12px;cursor:pointer;white-space:nowrap}
+  button:hover{background:#2e3d52}
+  button.primary{background:#1d4f7c;border-color:#2b6ea8}
+  button.primary:hover{background:#245f95}
+  .box{background:#11161d;border:1px solid var(--line);border-radius:5px;padding:7px 8px;margin:7px 0}
+  .kv{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+  .kv span:first-child{color:var(--dim)} .kv span:last-child{color:var(--txt)}
+  #hud{position:absolute;left:10px;top:10px;background:rgba(10,14,20,.88);border:1px solid var(--line);
+    border-radius:5px;padding:7px 10px;font-variant-numeric:tabular-nums;pointer-events:none;font-size:12px}
+  #hint{position:absolute;left:10px;bottom:10px;background:rgba(10,14,20,.88);border:1px solid var(--line);
+    border-radius:5px;padding:6px 10px;pointer-events:none;color:var(--dim);max-width:60%}
+  #busy{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:rgba(10,14,20,.92);
+    border:1px solid var(--acc);border-radius:5px;padding:6px 12px;color:var(--acc);display:none}
+  .drop{border:1px dashed var(--line);border-radius:6px;padding:11px;text-align:center;color:var(--dim);cursor:pointer}
+  .drop.over{border-color:var(--acc);color:var(--acc)}
+  .drop.done{border-style:solid;border-color:var(--ok);color:var(--ok)}
+  #names{max-height:190px;overflow-y:auto;border:1px solid var(--line);border-radius:4px;background:#0d1117}
+  #cats{display:flex;flex-wrap:wrap;gap:4px;margin:7px 0 3px}
+  .chip{border:1px solid var(--line);background:#11161d;color:var(--dim);border-radius:11px;
+        padding:2px 9px;font-size:11px;cursor:pointer;user-select:none;white-space:nowrap}
+  .chip:hover{border-color:var(--acc)}
+  .chip b{color:var(--txt);font-weight:400;opacity:.75;margin-left:5px}
+  .chip.on{background:rgba(61,255,110,.15);border-color:var(--hot);color:var(--hot)}
+  .chip.on b{color:var(--hot);opacity:.8}
+  .chip.off{background:rgba(255,80,80,.13);border-color:#ff5c5c;color:#ff9a9a;text-decoration:line-through}
+  .chip.off b{color:#ff9a9a}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;
+       vertical-align:middle;box-shadow:0 0 4px currentColor}
+  .nm{display:flex;align-items:center;gap:6px;padding:2px 6px;font-size:12px;cursor:pointer}
+  .nm:hover{background:#1a2230}
+  .nm b{flex:1;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .nm i{color:var(--dim);font-style:normal;font-size:11px}
+  #res{max-height:230px;overflow-y:auto;border:1px solid var(--line);border-radius:4px;background:#0d1117;margin-top:5px}
+  .rr{display:flex;gap:6px;align-items:center;padding:2px 6px;font-size:11.5px;cursor:pointer;
+      font-variant-numeric:tabular-nums;white-space:nowrap}
+  .rr:hover{background:#1a2230}
+  .rr b{color:var(--hot);font-weight:400;min-width:120px;overflow:hidden;text-overflow:ellipsis}
+  .rr span{color:var(--dim)}
+  .rr u{color:var(--acc);text-decoration:none;margin-left:auto}
+  textarea{width:100%;height:52px;background:#11161d;color:var(--txt);border:1px solid var(--line);
+    border-radius:4px;font:11px monospace}
+  .tag{display:inline-block;background:#243040;border-radius:3px;padding:1px 5px;font-size:11px;margin:2px 2px 0 0}
+  #tip{position:absolute;background:rgba(10,14,20,.95);border:1px solid var(--hot);border-radius:4px;
+    padding:4px 8px;font-size:12px;pointer-events:none;display:none;white-space:nowrap}
+  .foot{margin:18px 0 4px;padding-top:10px;border-top:1px solid var(--line)}
+  .foot a{display:flex;align-items:center;gap:7px;color:var(--acc);text-decoration:none;font-size:12px}
+  .foot a:hover{text-decoration:underline}
+  .foot a svg{flex:none;width:15px;height:15px;fill:currentColor}
+  .foot small{display:block;margin:3px 0 0 22px;font-size:11px;line-height:1.35}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="side">
+    <div class="hdr">
+      <h1 data-t="titl">Anymaker — save map</h1>
+      <select id="lang"><option value="en">English</option><option value="ru">Русский</option></select>
+    </div>
+    <small data-t="intro">Drop the save archive (ZIP) — part search runs right in the browser, no internet.</small>
+
+    <h2 data-t="sec_files">1. Files</h2>
+    <div id="dropMap" class="drop"></div>
+    <div id="dropSave" class="drop" style="margin-top:6px"></div>
+    <input type="file" id="fMap" accept="image/*" style="display:none">
+    <input type="file" id="fSave" accept=".zip,.pdf,application/zip" style="display:none">
+    <div class="box" id="stat"></div>
+    <div class="box" id="players"></div>
+
+    <h2 data-t="sec_find">2. Part search</h2>
+    <div class="row"><label data-t="find">Find</label><input type="text" id="q" data-tp="find_ph"></div>
+    <div class="row"><label data-t="excl">Exclude</label><input type="text" id="qx" data-tp="excl_ph"></div>
+    <div class="row">
+      <label data-t="where">Where</label>
+      <select id="src">
+        <option value="" data-t="src_any">anywhere</option>
+        <option value="ground" data-t="src_ground">items on the ground</option>
+        <option value="component" data-t="src_component">parts on vehicles/buildings</option>
+        <option value="stored" data-t="src_stored">inside containers</option>
+        <option value="props" data-t="src_props">world props</option>
+        <option value="actors" data-t="src_actors">NPCs</option>
+        <option value="vehicles" data-t="src_vehicles">vehicles/buildings</option>
+        <option value="dungeon" data-t="src_dungeon">inside dungeons only</option>
+      </select>
+    </div>
+    <div id="cats"></div>
+    <div class="row"><small id="catHint"></small></div>
+    <div class="row"><button id="bAll" class="primary" data-t="b_all">Select all</button>
+      <button id="bNone" data-t="b_none">Clear</button><button id="bTop" data-t="b_top">Top 20</button></div>
+    <div id="names"></div>
+
+    <h2 data-t="sec_found">3. Found</h2>
+    <div class="row"><span class="val" id="resSum" style="color:var(--hot)">—</span>
+      <button id="bCsv" data-t="b_csv">CSV</button><button id="bList" data-t="b_list">List</button></div>
+    <div id="res"></div>
+
+    <h2 data-t="sec_view">4. View</h2>
+    <div class="row"><label data-t="v_tiles">Save tiles</label><input type="checkbox" id="dTiles" checked></div>
+    <div class="row"><label data-t="v_cells">Grid A-P</label><input type="checkbox" id="dCells"></div>
+    <div class="row"><label data-t="v_order">Order</label><button id="bSwap" style="flex:1"></button></div>
+    <div class="row"><label><span class="dot" style="background:#00e5d6;color:#00e5d6"></span><span data-t="v_all">All objects</span></label><input type="checkbox" id="dAll"></div>
+    <div class="row"><label><span class="dot" style="background:#3dff6e;color:#3dff6e"></span><span data-t="v_found">Found</span></label><input type="checkbox" id="dFound" checked></div>
+    <div class="row"><label><span class="dot" style="background:#ffc400;color:#ffc400"></span><span data-t="v_players">Players</span></label><input type="checkbox" id="dPlayers" checked></div>
+    <div class="row"><label data-t="v_size">Dot size</label><input type="range" id="dSize" min="2" max="10" value="4"><span id="pV" style="font-size:11px;color:var(--dim)"></span></div>
+
+    <h2 data-t="sec_cal">5. Calibration</h2>
+    <div class="row"><label data-t="c_s">units/px</label><input type="number" id="nS" step="0.000001"><input type="range" id="sS" min="0" max="1000"></div>
+    <div class="row"><label data-t="c_x">world X left</label><input type="number" id="nX" step="0.01"><input type="range" id="sX" min="-200000" max="200000"></div>
+    <div class="row"><label data-t="c_z">world Z top</label><input type="number" id="nZ" step="0.01"><input type="range" id="sZ" min="-200000" max="200000"></div>
+    <div class="row"><label data-t="c_flip">Mirror Z</label><input type="checkbox" id="flip" checked>
+      <button id="bReset" data-t="b_reset">Reset</button><button id="bFit" data-t="b_fit">Fit</button></div>
+    <div class="row"><small id="calInfo"></small></div>
+    <textarea id="csv" readonly style="display:none"></textarea>
+
+    <h2 data-t="sec_nav">6. Navigation</h2>
+    <div class="row"><label data-t="n_sq">Square</label><input type="text" id="gq" placeholder="L 12"><button id="bGo">→</button></div>
+    <div class="row"><label data-t="n_tile">Tile tx_ty</label><input type="text" id="tq" placeholder="104 117"><button id="bGoT">→</button></div>
+    <div class="row"><label data-t="n_world">World X / Z</label><input type="number" id="wx" placeholder="X" style="max-width:78px">
+      <input type="number" id="wz" placeholder="Z" style="max-width:78px"><button id="bGoW">→</button></div>
+
+    <div class="foot">
+      <a id="ghLink" href="https://github.com/NicRoss512/AnyMakerToolMap" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-2.91-.88-2.91-2.9 0-.79.28-1.44.74-1.95-.07-.2-.32-.93.07-1.94 0 0 .62-.2 2.02.74a6.9 6.9 0 0 1 1.84-.25c.62 0 1.25.08 1.84.25 1.4-.94 2.01-.74 2.01-.74.39 1.01.14 1.74.07 1.94.46.51.74 1.15.74 1.95 0 2.03-1.14 2.7-2.92 2.9.3.26.56.76.56 1.54 0 1.11-.01 2-.01 2.28 0 .21.15.46.55.38A7.99 7.99 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span data-t="gh_txt">AnyMakerToolMap on GitHub</span>
+      </a>
+      <small data-t="gh_sub">Source, updates and the save-format write-up — opens in a new tab.</small>
+    </div>
+  </div>
+  <div id="main">
+    <canvas id="cv"></canvas>
+    <button id="bSide">☰</button>
+    <div id="hud"></div>
+    <div id="hint"></div>
+    <div id="busy"></div>
+    <div id="tip"></div>
+  </div>
+</div>
+
+<script>/*__JSZIP__*/</script>
+<script>/*__CATS__*/</script>
+<script>
+const T=512, TZ=512*Math.sqrt(3)/2, SH=256, LTR='ABCDEFGHIJKLMNOP';
+const DEF={s:3.180124224, ox:74484.08, oz:58513.82, fz:-1};
+
+const S={img:null,s:DEF.s,ox:DEF.ox,oz:DEF.oz,fz:DEF.fz,view:{x:0,y:0,k:1},
+         drag:null,hover:null,sel:new Set(),found:[],tip:null,
+         gswap:true,   // true: буквы A-P по вертикали (снизу вверх), цифры 00-15 по горизонтали
+         players:[], mapName:'', mapTried:false, saveName:'',
+         rows:[],   // названия, прошедшие фильтр (список может быть длиннее 300)
+         cat:{},    // категория -> 1 «только», −1 «кроме», 0 — не важно
+         zone:0};   // данжи: 1 — только внутри, −1 — кроме данжей, 0 — всё
+const IDX={names:[],ids:new Map(),pts:[],tiles:new Map(),total:0,files:0,
+           x0:1/0,z0:1/0,x1:-1/0,z1:-1/0};
+/* ---------- язык ---------- */
+const I18N={
+en:{
+ titl:'Anymaker — save map',
+ intro:'Drop the save archive (ZIP) — part search runs right in the browser, no internet.',
+ sec_files:'1. Files', sec_find:'2. Part search', sec_found:'3. Found',
+ sec_view:'4. View', sec_cal:'5. Calibration', sec_nav:'6. Navigation',
+ map_prompt:'Map: PNG 4096×4096<br><small>drop or click</small>',
+ map_missing:'Map: PNG 4096×4096<br><small>worldmap.png not found next to this file — drop it by hand<br>search works without the map</small>',
+ save_prompt:'Save: ZIP<br><small>drop or click</small>',
+ nothing:'Nothing loaded yet.',
+ find:'Find', find_ph:'e.g. wheel, battery, seat',
+ excl:'Exclude', excl_ph:'e.g. tread, rim', where:'Where',
+ src_any:'anywhere', src_ground:'items on the ground', src_component:'parts on vehicles/buildings',
+ src_stored:'inside containers', src_props:'world props', src_actors:'NPCs',
+ src_vehicles:'vehicles/buildings', src_dungeon:'inside dungeons only',
+ b_all:'Select all', b_none:'Clear', b_top:'Top 20', b_csv:'CSV', b_list:'List',
+ v_tiles:'Save tiles', v_cells:'Grid A-P', v_order:'Order', v_all:'All objects',
+ v_found:'Found', v_players:'Players', v_size:'Dot size',
+ c_s:'units/px', c_x:'world X left', c_z:'world Z top', c_flip:'Mirror Z',
+ b_reset:'Reset', b_fit:'Fit',
+ n_sq:'Square', n_tile:'Tile tx_ty', n_world:'World X / Z',
+ order_v:'letters ↑ up, digits → right', order_h:'letters → right, digits ↑ up',
+ pcs:'pcs', none_found:'nothing found', empty:'empty',
+ stat_files:'JSON files', stat_tiles:'save tiles', stat_objs:'objects total',
+ stat_names:'distinct names', stat_x:'X range', stat_z:'Z range',
+ players:'Players', no_players:'No player positions in this save.',
+ busy_read:'Reading archive…', busy_parse:'Parsing {i} / {n} files · {c} objects',
+ err:'Error: ', save_ok:'Save loaded ✓', map_ok:'Map loaded ✓',
+ fmt_sq:'Format: a letter A-P and a number, e.g. L 12', fmt_tile:'Format: tx_ty, e.g. 104 117',
+ hint_start:'Map loads itself from worldmap.png next to this file. Wheel — zoom, drag — pan.',
+ hint_csv:'CSV ready ({n} rows) — if the download is blocked, copy it from the box at the bottom left.',
+ hud_nomap:'no map', hud_hover:'hover the cursor', hud_px:'pixel', hud_sq:'square',
+ hud_world:'world', hud_tile:'tile',
+ nomap:'Map not loaded — drop worldmap.png on the left',
+ nomap2:'search, coordinates and CSV work without the map',
+ s_ground:'on the ground', s_component:'on a vehicle', s_stored:'in a container',
+ s_npc_inv:'in an NPC inventory',
+ s_props:'prop', s_actors:'NPC', s_entities:'object', s_vehicles:'vehicle/building', s_dome:'dome',
+ zone:'dungeon {n}', surface:'surface', in_veh:'coordinates are the vehicle\'s',
+ in_dungeon:'inside dungeon №{n}',
+ csv_head:'name;worldX;worldZ;worldY;tile;square;source;zone',
+ tt_show:'Show the side panel', tt_hide:'Hide the side panel',
+ cat_reset:'reset', cat_hint:'клик: «только» → «кроме» → как было',
+ in_dungeons:'In dungeons', shown_of:'shown {a} of {b}',
+ gh_txt:'AnyMakerToolMap on GitHub',
+ gh_sub:'Source, updates and the save-format write-up — opens in a new tab.'},
+ru:{
+ titl:'Anymaker — карта сейва',
+ intro:'Закинь архив с сейвом (ZIP) — поиск считается прямо в браузере, без интернета.',
+ sec_files:'1. Файлы', sec_find:'2. Поиск запчастей', sec_found:'3. Найдено',
+ sec_view:'4. Вид', sec_cal:'5. Привязка', sec_nav:'6. Навигация',
+ map_prompt:'Карта: PNG 4096×4096<br><small>перетащи или кликни</small>',
+ map_missing:'Карта: PNG 4096×4096<br><small>worldmap.png не найден рядом — перетащи вручную<br>поиск работает и без карты</small>',
+ save_prompt:'Сейв: ZIP<br><small>перетащи или кликни</small>',
+ nothing:'Ничего не загружено.',
+ find:'Найти', find_ph:'напр. wheel, battery, seat',
+ excl:'Исключить', excl_ph:'напр. tread, rim', where:'Где искать',
+ src_any:'везде', src_ground:'предметы на земле', src_component:'запчасти в технике/стройках',
+ src_stored:'внутри контейнеров', src_props:'пропсы мира', src_actors:'NPC',
+ src_vehicles:'техника/здания целиком', src_dungeon:'только внутри данжей',
+ b_all:'Выбрать всё', b_none:'Снять', b_top:'Топ-20', b_csv:'CSV', b_list:'Список',
+ v_tiles:'Тайлы сейва', v_cells:'Квадраты A-P', v_order:'Порядок', v_all:'Все объекты',
+ v_found:'Найденное', v_players:'Игроки', v_size:'Размер точки',
+ c_s:'ед/пиксель', c_x:'мир X слева', c_z:'мир Z сверху', c_flip:'Зеркало Z',
+ b_reset:'Сброс', b_fit:'Вписать',
+ n_sq:'Квадрат', n_tile:'Тайл tx_ty', n_world:'Мир X / Z',
+ order_v:'буквы ↕ вверх, цифры → вправо', order_h:'буквы → вправо, цифры ↕ вверх',
+ pcs:'шт.', none_found:'ничего не найдено', empty:'пусто',
+ stat_files:'файлов JSON', stat_tiles:'тайлов сейва', stat_objs:'объектов всего',
+ stat_names:'разных названий', stat_x:'габарит X', stat_z:'габарит Z',
+ players:'Игроки', no_players:'Позиций игроков в сейве нет.',
+ busy_read:'Читаю архив…', busy_parse:'Разбор {i} / {n} файлов · {c} объектов',
+ err:'Ошибка: ', save_ok:'Сейв загружен ✓', map_ok:'Карта загружена ✓',
+ fmt_sq:'Формат: буква A-P и число, напр. L 12', fmt_tile:'Формат: tx_ty, напр. 104 117',
+ hint_start:'Карта подхватывается сама из worldmap.png рядом с файлом. Колесо — зум, тяни — панорама.',
+ hint_csv:'CSV готов ({n} строк) — если скачивание заблокировано, скопируй из поля слева внизу.',
+ hud_nomap:'нет карты', hud_hover:'наведи курсор', hud_px:'пиксель', hud_sq:'квадрат',
+ hud_world:'мир', hud_tile:'тайл',
+ nomap:'Карта не загружена — перетащи worldmap.png слева',
+ nomap2:'поиск, координаты и CSV работают и без карты',
+ s_ground:'на земле', s_component:'в технике', s_stored:'в контейнере',
+ s_npc_inv:'в инвентаре NPC',
+ s_props:'пропс', s_actors:'NPC', s_entities:'объект', s_vehicles:'техника/здание', s_dome:'купол',
+ zone:'данж {n}', surface:'поверхность', in_veh:'координаты — самой техники',
+ in_dungeon:'внутри данжа №{n}',
+ csv_head:'name;worldX;worldZ;worldY;tile;square;source;zone',
+ tt_show:'Показать боковую панель', tt_hide:'Скрыть боковую панель',
+ cat_reset:'сброс', cat_hint:'клик: «только» → «кроме» → как было',
+ in_dungeons:'В данжах', shown_of:'показано {a} из {b}',
+ gh_txt:'AnyMakerToolMap на GitHub',
+ gh_sub:'Исходники, обновления и разбор формата сейва — откроется в новой вкладке.'}};
+let LANG='en';
+try{const l=localStorage.getItem('am_lang');if(l&&I18N[l])LANG=l;}catch(e){}
+function tr(k,v){
+  let s=(I18N[LANG]&&I18N[LANG][k]!==undefined)?I18N[LANG][k]:(I18N.en[k]!==undefined?I18N.en[k]:k);
+  if(v)for(const a in v)s=s.split('{'+a+'}').join(v[a]);
+  return s;}
+function applyLang(){
+  document.documentElement.lang=LANG;
+  document.title=tr('titl');
+  document.querySelectorAll('[data-t]').forEach(e=>e.innerHTML=tr(e.dataset.t));
+  document.querySelectorAll('[data-tp]').forEach(e=>e.placeholder=tr(e.dataset.tp));
+  $('lang').value=LANG;
+  $('bSide').title=tr($('app').classList.contains('nos')?'tt_show':'tt_hide');
+  mapZone();saveZone();updStat();updPlayers();renderCats();syncGridBtn();syncUI();rebuild();updHud();draw();}
+
+const ZN=d=>d?tr('zone',{n:d}):'';
+const SRC={ground:'s_ground',component:'s_component',stored:'s_stored',props:'s_props',
+           actors:'s_actors',entities:'s_entities',vehicles:'s_vehicles',dome:'s_dome',
+           npc_inv:'s_npc_inv'};
+const SRCNAME=k=>tr(SRC[k]||k);
+
+const $=id=>document.getElementById(id);
+let CUR_ZONE=0;                       // 0 = поверхность, 1..3 = данж №
+const cv=$('cv'), ctx=cv.getContext('2d');
+
+/* ---------- geometry ---------- */
+const tileCorners=(tx,ty)=>{const ax=T*tx+SH*ty,az=TZ*ty;
+  return [[ax,az],[ax+T,az],[ax+T+SH,az+TZ],[ax+SH,az+TZ]];};
+const tileCenter=(tx,ty)=>[T*tx+SH*ty+T/2+SH/2, TZ*(ty+0.5)];
+function worldToTile(x,z){const b=z/TZ,ty=Math.floor(b);const u=(x-SH*z/TZ)/T,tx=Math.floor(u);
+  return [tx,ty,u-tx,b-ty];}
+const w2i=(x,z)=>[(x-S.ox)/S.s, S.fz*(z-S.oz)/S.s];
+const i2w=(ix,iy)=>[S.ox+ix*S.s, S.oz+S.fz*iy*S.s];
+function pixelToGrid(px,py){
+  const W=4096,H=4096;            // размер карты по умолчанию (считаем и без картинки)
+  const iw=S.img?S.img.width:W, ih=S.img?S.img.height:H;
+  if(!(px>=0&&px<iw&&py>=0&&py<ih))return null;
+  const col=Math.floor(px/256), row=Math.floor((ih-1-py)/256);
+  if(col<0||col>15||row<0||row>15)return null;
+  return S.gswap ? LTR[row]+' '+String(col).padStart(2,'0')
+                 : LTR[col]+' '+String(row).padStart(2,'0');}
+/* подпись клетки: c = столбец слева, r = ряд снизу */
+const gridName=(c,r)=>S.gswap ? LTR[r]+' '+String(c).padStart(2,'0')
+                              : LTR[c]+' '+String(r).padStart(2,'0');
+/* разбор «L 12» → [столбец, ряд снизу] */
+function gridParse(t){
+  const m=t.trim().toUpperCase().match(/^([A-P])\s*(\d+)$/);
+  if(!m)return null;
+  const li=LTR.indexOf(m[1]), num=+m[2];
+  return S.gswap ? [num,li] : [li,num];}
+
+/* ---------- view ---------- */
+function resize(){const r=cv.parentElement.getBoundingClientRect();
+  cv.width=r.width;cv.height=r.height;draw();}
+const toScreen=(ix,iy)=>[(ix-S.view.x)*S.view.k,(iy-S.view.y)*S.view.k];
+const toImage=(sx,sy)=>[sx/S.view.k+S.view.x, sy/S.view.k+S.view.y];
+
+function draw(){
+  const W=cv.width,H=cv.height;
+  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#0b0e13';ctx.fillRect(0,0,W,H);
+  if(!S.img){
+    ctx.fillStyle='#8b98a9';ctx.font='14px sans-serif';ctx.textAlign='center';
+    ctx.fillText(tr('nomap'),W/2,H/2-18);
+    ctx.fillText(tr('nomap2'),W/2,H/2+4);
+    return;}
+  ctx.imageSmoothingEnabled=S.view.k<1;
+  const o=toScreen(0,0);
+  ctx.drawImage(S.img,o[0],o[1],S.img.width*S.view.k,S.img.height*S.view.k);
+  ctx.save();ctx.translate(o[0],o[1]);ctx.scale(S.view.k,S.view.k);
+
+  if($('dCells').checked){
+    ctx.strokeStyle='rgba(255,255,255,.28)';ctx.lineWidth=1/S.view.k;
+    for(let i=0;i<=16;i++){
+      ctx.beginPath();ctx.moveTo(i*256,0);ctx.lineTo(i*256,S.img.height);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(0,i*256);ctx.lineTo(S.img.width,i*256);ctx.stroke();}
+    ctx.font=(15/S.view.k)+'px monospace';ctx.textAlign='left';
+    for(let c=0;c<16;c++)for(let r=0;r<16;r++){
+      const x0=c*256,y0=S.img.height-r*256-256,t=gridName(c,r);
+      ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText(t,x0+7/S.view.k+1,y0+23/S.view.k+1);
+      ctx.fillStyle='rgba(255,235,60,.9)';ctx.fillText(t,x0+7/S.view.k,y0+23/S.view.k);}
+  }
+
+  if($('dTiles').checked){
+    for(const key of IDX.tiles.keys()){
+      const [tx,ty]=key.split('_').map(Number);
+      const c=tileCorners(tx,ty).map(v=>w2i(v[0],v[1]));
+      ctx.beginPath();ctx.moveTo(c[0][0],c[0][1]);
+      for(let i=1;i<4;i++)ctx.lineTo(c[i][0],c[i][1]);
+      ctx.closePath();
+      ctx.fillStyle='rgba(78,163,255,.09)';ctx.fill();
+      ctx.strokeStyle='rgba(78,163,255,.55)';ctx.lineWidth=1/S.view.k;ctx.stroke();}
+  }
+
+  if($('dAll').checked) drawPts(null,C_ALL,1.5);
+
+  if($('dFound').checked&&S.sel.size) drawFound();
+  if($('dPlayers').checked) drawPlayers();
+  ctx.restore();
+}
+
+const CAP=600000;               // жёсткий предел отрисовки за один кадр
+const C_ALL='rgba(0,229,214,.72)';   // все объекты — бирюзовый
+const C_FND='#3dff6e';               // найденное — зелёный
+/* границы видимой области в координатах картинки */
+function vport(){const k=S.view.k;
+  return [S.view.x-4,S.view.y-4,S.view.x+cv.width/k+4,S.view.y+cv.height/k+4];}
+/* сколько точек примерно попадёт в кадр (чтобы решать, нужна ли склейка) */
+function estVisible(){
+  const bw=(IDX.x1-IDX.x0)/S.s||1, bh=(IDX.z1-IDX.z0)/S.s||1;
+  const [vx0,vy0,vx1,vy1]=vport();
+  const fx=Math.max(0,Math.min(1,(vx1-vx0)/bw)), fy=Math.max(0,Math.min(1,(vy1-vy0)/bh));
+  return IDX.total*fx*fy;}
+function drawPts(ids,color,size){
+  const r=size/S.view.k, k=S.view.k;
+  const [vx0,vy0,vx1,vy1]=vport();
+  /* склейка повторов только когда точек реально много и всё равно слипнется;
+     при приближении рисуем каждую точку отдельно — иначе часть объектов пропадает */
+  const seen = estVisible()>80000 ? new Set() : null;
+  ctx.fillStyle=color;ctx.beginPath();
+  const list= ids? ids : IDX.names.map((_,i)=>i);
+  let n=0;
+  for(const id of list){
+    const p=IDX.pts[id]; if(!p) continue;
+    for(let i=0;i<p.x.length;i++){
+      const q=w2i(p.x[i],p.z[i]);
+      if(q[0]<vx0||q[1]<vy0||q[0]>vx1||q[1]>vy1)continue;   // вне экрана — не считаем
+      if(seen){const sx=(((q[0]-S.view.x)*k)|0)+8, sy=(((q[1]-S.view.y)*k)|0)+8;
+        const key=sy*20000+sx;
+        if(seen.has(key))continue; seen.add(key);}
+      ctx.rect(q[0]-r/2,q[1]-r/2,r,r);
+      if(++n>=CAP)break;}
+    if(n>=CAP)break;}
+  ctx.fill();
+}
+function drawFound(){
+  const r=(+$('dSize').value)/S.view.k, k=S.view.k;
+  const [vx0,vy0,vx1,vy1]=vport();
+  const seen = S.found.length>80000 ? new Set() : null;
+  ctx.fillStyle=C_FND;ctx.beginPath();
+  let n=0;
+  for(let i=0;i<S.found.length;i++){
+    const f=S.found[i], q=w2i(f[0],f[1]);
+    if(q[0]<vx0||q[1]<vy0||q[0]>vx1||q[1]>vy1)continue;   // вне экрана — не считаем
+    if(seen){const sx=(((q[0]-S.view.x)*k)|0)+8, sy=(((q[1]-S.view.y)*k)|0)+8;
+      const key=sy*20000+sx;
+      if(seen.has(key))continue; seen.add(key);}
+    ctx.rect(q[0]-r/2,q[1]-r/2,r,r);
+    if(++n>=CAP)break;}
+  ctx.fill();
+}
+
+/* ---------- hud ---------- */
+function updHud(){
+  const h=$('hud');
+  if(!S.img){h.textContent=tr('hud_nomap');return;}
+  if(!S.hover){h.innerHTML=tr('hud_hover');return;}
+  const [ix,iy]=S.hover,[wx,wz]=i2w(ix,iy),[tx,ty,a,b]=worldToTile(wx,wz);
+  const g=pixelToGrid(ix,iy);
+  h.innerHTML=`${tr('hud_px')} <b>${ix.toFixed(0)}, ${iy.toFixed(0)}</b>${g?' · '+tr('hud_sq')+' <b>'+g+'</b>':''}<br>`+
+    `${tr('hud_world')} <b>X ${wx.toFixed(0)}  Z ${wz.toFixed(0)}</b><br>`+
+    `${tr('hud_tile')} <b>${tx}_${ty}</b> a=${a.toFixed(2)} b=${b.toFixed(2)}`;
+}
+
+/* ---------- index ---------- */
+function slot(name){
+  let id=IDX.ids.get(name);
+  if(id===undefined){id=IDX.names.length;IDX.ids.set(name,id);
+    IDX.pts.push({x:[],z:[],y:[],s:[],d:[]});IDX.names.push(name);}
+  return id;}
+function add(id,x,y,z,src){
+  if(!isFinite(x)||!isFinite(z))return;          // защита от мусорных координат
+  if(Math.abs(x)+Math.abs(z)<0.5)return;         // объекты без позиции (t=[0,y,0]) не учитываем
+  const p=IDX.pts[id];p.x.push(x);p.y.push(y);p.z.push(z);p.s.push(src);p.d.push(CUR_ZONE);
+  IDX.total++;
+  if(x<IDX.x0)IDX.x0=x; if(x>IDX.x1)IDX.x1=x;
+  if(z<IDX.z0)IDX.z0=z; if(z>IDX.z1)IDX.z1=z;}
+/* имя предмета: если это коробка-заготовка (vehicle_editor_add_component),
+   настоящая деталь лежит в component_def, а не в _type */
+function itemName(it){
+  if(!it||typeof it!=='object')return null;
+  return it.component_def||it._type||null;}
+function res(defs,v){
+  if(typeof v==='string')return v;
+  if(typeof v==='number')return (defs&&v<defs.length)?defs[v]:null;
+  return null;}
+function parseJson(rel,txt){
+  let j;try{j=JSON.parse(txt);}catch(e){return 0;}
+  const defs=(j.definitions&&j.definitions.components)||[];
+  const dm=rel.match(/dungeon_(\d+)_/);CUR_ZONE=dm?(1+ +dm[1]):0;
+  /* позиции игроков (в сетевой игре их несколько) лежат в scene.json */
+  if(/scene\.json$/i.test(rel)){
+    const ps=(j.peers&&j.peers.peers)||[];
+    for(const pe of ps){const w=pe.world_pos;
+      if(w&&w.length>=3&&isFinite(w[0])&&isFinite(w[2])&&Math.abs(w[0])+Math.abs(w[2])>0.5)
+        S.players.push({uid:String(pe.uid||''),x:w[0],y:w[1],z:w[2]});}}
+  const m=rel.match(/tile_(\d+)_(\d+)_/);
+  if(m)IDX.tiles.set(m[1]+'_'+m[2],1);
+  let n=0;
+  const secs=[['props','props','props'],['floor_items','items','ground'],
+              ['actors','actors','actors'],['entities','entities','entities'],
+              ['creative_domes','domes','dome']];
+  for(const [sec,key,src] of secs){
+    const lst=j[sec]&&j[sec][key];
+    if(!Array.isArray(lst))continue;
+    for(const el of lst){
+      const t=el.transform&&el.transform.t;
+      if(!t||t.length<3)continue;
+      let name;
+      if(sec==='floor_items'){
+        name=itemName(el.item)||res(defs,el.definition_id)||'item';
+        add(slot(name),t[0],t[1],t[2],'ground');n++;
+        for(const ch of ((el.item&&el.item.children)||[])){
+          const nm2=itemName(ch.item);
+          if(nm2){add(slot(nm2),t[0],t[1],t[2],'ground');n++;}}
+        continue;}
+      if(sec==='entities') name=String(el.type||src);
+      else name=res(defs,el.definition_id)||(el.entity_type?String(el.entity_type):src);
+      add(slot(name),t[0],t[1],t[2],src);n++;
+      /* инвентарь NPC координат не имеет — ставим в точку самого NPC */
+      const inv=el.inventory;
+      if(inv&&typeof inv==='object')for(const k in inv){
+        const v=inv[k];if(!v||typeof v!=='object')continue;
+        const nm=itemName(v.item||v);
+        if(nm){add(slot(nm),t[0],t[1],t[2],'npc_inv');n++;}
+        for(const ch of (v.children||[])){const nm2=itemName(ch.item);
+          if(nm2){add(slot(nm2),t[0],t[1],t[2],'npc_inv');n++;}}}}
+  }
+  const vs=j.vehicles&&j.vehicles.vehicles;
+  if(Array.isArray(vs))for(const v of vs){
+    const t=v.transform&&v.transform.t;if(!t)continue;
+    add(slot('<техника/здание>'),t[0],t[1],t[2],'vehicles');n++;
+    for(const g of (v.grids||[]))for(const c of (g.components||[])){
+      const cn=res(defs,c.def)||('#'+c.def);
+      add(slot(cn),t[0],t[1],t[2],'component');n++;
+      for(const it of (c.items||[])){
+        const o=it.item||it, n2=itemName(o)||'item';
+        add(slot(n2),t[0],t[1],t[2],'stored');n++;}
+      const acc=c.element&&c.element.acc;
+      if(acc){const n3=itemName(acc.item);
+        if(n3){add(slot(n3),t[0],t[1],t[2],'stored');n++;}}}
+  }
+  IDX.files++;return n;}
+
+async function loadSave(file){
+  const busy=$('busy');busy.style.display='block';
+  IDX.names.length=0;IDX.ids.clear();IDX.pts.length=0;IDX.tiles.clear();
+  IDX.total=0;IDX.files=0;IDX.x0=1/0;IDX.z0=1/0;IDX.x1=-1/0;IDX.z1=-1/0;
+  S.sel.clear();S.found=[];CUR_ZONE=0;S.players=[];
+  try{
+    busy.textContent=tr('busy_read');await new Promise(r=>setTimeout(r,10));
+    const zip=await JSZip.loadAsync(file);
+    const files=[];
+    zip.forEach((rel,f)=>{if(!f.dir&&/\.json$/i.test(rel))files.push(rel);});
+    files.sort((a,b)=>(/tiles\//.test(b)?1:0)-(/tiles\//.test(a)?1:0));
+    for(let i=0;i<files.length;i++){
+      if(i%3===0){busy.textContent=tr('busy_parse',{i:i+1,n:files.length,c:IDX.total.toLocaleString()});
+        await new Promise(r=>setTimeout(r,0));}
+      try{ parseJson(files[i], await zip.file(files[i]).async('string')); }catch(e){}
+    }
+  }catch(e){busy.textContent=tr('err')+e.message;setTimeout(()=>busy.style.display='none',4000);
+    $('dropSave').classList.remove('done');saveZone();return;}
+  busy.style.display='none';
+  S.saveName=file.name;saveZone();
+  updStat();updPlayers();countCats();
+  rebuild();
+  if(S.img)fitSave();
+}
+function updStat(){
+  if(!IDX.files){$('stat').innerHTML='<small>'+tr('nothing')+'</small>';return;}
+  $('stat').innerHTML=
+    `<div class="kv"><span>${tr('stat_files')}</span><span>${IDX.files}</span></div>`+
+    `<div class="kv"><span>${tr('stat_tiles')}</span><span>${IDX.tiles.size}</span></div>`+
+    `<div class="kv"><span>${tr('stat_objs')}</span><span>${IDX.total.toLocaleString()}</span></div>`+
+    `<div class="kv"><span>${tr('stat_names')}</span><span>${IDX.names.length}</span></div>`+
+    `<div class="kv"><span>${tr('stat_x')}</span><span>${IDX.x0.toFixed(0)} … ${IDX.x1.toFixed(0)}</span></div>`+
+    `<div class="kv"><span>${tr('stat_z')}</span><span>${IDX.z0.toFixed(0)} … ${IDX.z1.toFixed(0)}</span></div>`;}
+/* ---------- зоны перетаскивания и список игроков ---------- */
+function mapZone(){
+  const el=$('dropMap');
+  if(S.img){el.classList.add('done');
+    el.innerHTML=tr('map_ok')+'<br><small>'+(S.mapName||'worldmap.png')+' ('+S.img.width+'×'+S.img.height+')</small>';}
+  else{el.classList.remove('done');el.innerHTML=S.mapTried?tr('map_missing'):tr('map_prompt');}}
+function saveZone(){
+  const el=$('dropSave');
+  if(IDX.total){el.classList.add('done');
+    el.innerHTML=tr('save_ok')+'<br><small>'+(S.saveName||'')+'</small>';}
+  else{el.classList.remove('done');el.innerHTML=tr('save_prompt');}}
+function updPlayers(){
+  const box=$('players');
+  box.style.display=IDX.files?'block':'none';
+  if(!S.players.length){box.innerHTML='<small>'+tr('no_players')+'</small>';return;}
+  box.innerHTML='<div class="kv"><span>'+tr('players')+'</span><span>'+S.players.length+'</span></div>'+
+    S.players.map((p,i)=>{const [tx,ty]=worldToTile(p.x,p.z);
+      const g=pixelToGrid(...w2i(p.x,p.z))||'—';
+      return `<div class="pp" data-i="${i}" title="${p.uid}"><b>P${i+1}</b>`+
+        `<span>${p.x.toFixed(0)}, ${p.z.toFixed(0)}</span>`+
+        `<span>${tx}_${ty} ${g}</span><u>→</u></div>`;}).join('');
+  box.querySelectorAll('.pp').forEach(e=>e.onclick=()=>{
+    const p=S.players[+e.dataset.i];goto(p.x,p.z);});}
+function drawPlayers(){
+  if(!S.players.length)return;
+  const r=8/S.view.k;
+  ctx.font=(12/S.view.k)+'px sans-serif';ctx.textAlign='center';
+  for(let i=0;i<S.players.length;i++){
+    const p=S.players[i],q=w2i(p.x,p.z);
+    ctx.beginPath();ctx.arc(q[0],q[1],r,0,6.2832);
+    ctx.fillStyle='rgba(255,196,0,.22)';ctx.fill();
+    ctx.lineWidth=1.8/S.view.k;ctx.strokeStyle='#ffc400';ctx.stroke();
+    ctx.beginPath();ctx.arc(q[0],q[1],Math.max(r*0.3,1/S.view.k),0,6.2832);
+    ctx.fillStyle='#ffc400';ctx.fill();
+    ctx.fillStyle='#ffc400';ctx.fillText('P'+(i+1),q[0],q[1]-r-4/S.view.k);}}
+
+/* ---------- категории ---------- */
+const grpName=g=>{const a=GRP[g];return a?(LANG==='ru'?a[1]:a[0]):g;};
+function catOf(id){
+  const c=CATS[id]; if(c)return c[0];
+  if(id==='<техника/здание>')return 'vehicle';
+  if(id.charAt(0)==='<')return 'unknown';
+  return 'other';}
+const dispName=id=>{const c=CATS[id];return (c&&c[1])||id;};
+let CATCNT={}, ZONECNT=0;
+function countCats(){
+  CATCNT={};ZONECNT=0;
+  for(let i=0;i<IDX.names.length;i++){
+    const p=IDX.pts[i], g=catOf(IDX.names[i]);
+    CATCNT[g]=(CATCNT[g]||0)+p.x.length;
+    for(let k=0;k<p.x.length;k++)if(p.d[k])ZONECNT++;}
+  renderCats();}
+function chipHtml(key,label,count,st){
+  return `<span class="chip${st>0?' on':(st<0?' off':'')}" data-${key[0]}="${key[1]}">`+
+    `${label}<b>${count.toLocaleString()}</b></span>`;}
+function renderCats(){
+  const gs=Object.keys(GRP).filter(g=>CATCNT[g]).sort((a,b)=>CATCNT[b]-CATCNT[a]);
+  const zc=ZONECNT?chipHtml(['z','1'],tr('in_dungeons'),ZONECNT,S.zone):'';
+  $('cats').innerHTML=zc+gs.map(g=>
+      chipHtml(['g',g],grpName(g),CATCNT[g],S.cat[g]||0)).join('')+
+    `<span class="chip" data-reset="1" style="border-style:dashed">${tr('cat_reset')}</span>`;
+  $('cats').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{
+    if(el.dataset.reset){S.cat={};S.zone=0;savePrefs();renderCats();rebuild();return;}
+    if(el.dataset.z){S.zone=(S.zone+2)%3-1;savePrefs();renderCats();rebuild();return;}
+    const g=el.dataset.g;
+    S.cat[g]=((S.cat[g]||0)+2)%3-1;        // 0 → только → кроме → 0
+    savePrefs();renderCats();rebuild();});
+  const n=Object.keys(S.cat).filter(g=>S.cat[g]).length+(S.zone?1:0);
+  $('catHint').textContent=n?tr('cat_hint'):'';}
+/* настройки фильтров запоминаются */
+function savePrefs(){try{localStorage.setItem('am_cats',
+  JSON.stringify({c:S.cat,z:S.zone}));}catch(e){}}
+function loadPrefs(){try{const o=JSON.parse(localStorage.getItem('am_cats')||'null');
+  if(o&&o.c){S.cat=o.c;S.zone=o.z|0;}}catch(e){}}
+
+/* ---------- search ---------- */
+function rebuild(){
+  const q=$('q').value.trim().toLowerCase();
+  const qx=$('qx').value.trim().toLowerCase();
+  const srcSel=$('src').value;
+  const inc=q?q.split(/[,;]+/).map(s=>s.trim()).filter(Boolean):[];
+  const exc=qx?qx.split(/[,;]+/).map(s=>s.trim()).filter(Boolean):[];
+  const catInc=new Set(), catExc=new Set();
+  for(const g in S.cat){if(S.cat[g]>0)catInc.add(g); else if(S.cat[g]<0)catExc.add(g);}
+  const rows=[];
+  for(let id=0;id<IDX.names.length;id++){
+    const nm=IDX.names[id], p=IDX.pts[id];
+    const dn=dispName(nm), l=(dn===nm?nm:nm+' '+dn).toLowerCase();
+    if(inc.length&&!inc.some(t=>l.includes(t)))continue;
+    if(exc.length&&exc.some(t=>l.includes(t)))continue;
+    if(catInc.size||catExc.size){const g=catOf(nm);
+      if(catInc.size&&!catInc.has(g))continue;
+      if(catExc.has(g))continue;}
+    let n=0;
+    for(let k=0;k<p.x.length;k++){
+      if(S.zone>0&&!p.d[k])continue;
+      if(S.zone<0&&p.d[k])continue;
+      if(srcSel==='dungeon'){if(!p.d[k])continue;}
+      else if(srcSel&&p.s[k]!==srcSel)continue;
+      n++;}
+    if(!n)continue;
+    rows.push([id,nm,n]);}
+  S.rows=rows;
+  rows.sort((a,b)=>b[2]-a[2]);
+  // сбрасываем выбор тех названий, которых нет в новом фильтре
+  if(S.sel.size){const keep=new Set(rows.map(r=>r[0]));
+    for(const id of Array.from(S.sel))if(!keep.has(id))S.sel.delete(id);}
+  const box=$('names');
+  const head=rows.length>300
+    ? '<small style="padding:4px 6px;display:block;color:var(--dim)">'+tr('shown_of',{a:300,b:rows.length})+'</small>'
+    : '';
+  box.innerHTML=head+rows.slice(0,300).map(([id,nm,n])=>
+    `<div class="nm" data-id="${id}"><input type="checkbox" data-id="${id}" ${S.sel.has(id)?'checked':''}>`+
+    `<b title="${nm}${dispName(nm)!==nm?' — '+dispName(nm):''} · ${grpName(catOf(nm))}">${nm}</b>`+
+    `<i>${n.toLocaleString()}</i></div>`).join('')||
+    '<small style="padding:6px">'+tr('none_found')+'</small>';
+  box.querySelectorAll('input').forEach(cb=>cb.onchange=e=>{
+    const id=+e.target.dataset.id;
+    if(e.target.checked)S.sel.add(id);else S.sel.delete(id);
+    recalc();});
+  box.querySelectorAll('.nm').forEach(d=>d.onclick=e=>{
+    if(e.target.tagName==='INPUT')return;
+    const id=+d.dataset.id, cb=d.querySelector('input');
+    cb.checked=!cb.checked;cb.onchange({target:cb});});
+  recalc();
+}
+function recalc(){
+  const srcSel=$('src').value;
+  const arr=[];
+  for(const id of S.sel){
+    const p=IDX.pts[id];if(!p)continue;
+    for(let k=0;k<p.x.length;k++){
+      if(S.zone>0&&!p.d[k])continue;
+      if(S.zone<0&&p.d[k])continue;
+      if(srcSel==='dungeon'){if(!p.d[k])continue;}
+      else if(srcSel&&p.s[k]!==srcSel)continue;
+      arr.push([p.x[k],p.z[k],p.y[k],IDX.names[id],p.s[k],p.d[k]]);}}
+  S.found=arr;
+  $('resSum').textContent=arr.length?arr.length.toLocaleString()+' '+tr('pcs'):'—';
+  renderRes();draw();}
+function renderRes(){
+  const box=$('res');
+  if(!S.found.length){box.innerHTML='<small style="padding:6px">'+tr('empty')+'</small>';return;}
+  const cx=i2w(cv.width/(2*S.view.k)+S.view.x, cv.height/(2*S.view.k)+S.view.y);
+  const arr=S.found.map(f=>{const dx=f[0]-cx[0],dz=f[1]-cx[1];
+    return [f,Math.sqrt(dx*dx+dz*dz)];}).sort((a,b)=>a[1]-b[1]).slice(0,400);
+  box.innerHTML=arr.map(([f])=>{
+    const [tx,ty]=worldToTile(f[0],f[1]);
+    const q=w2i(f[0],f[1]), g=pixelToGrid(q[0],q[1])||'—';
+    return `<div class="rr" data-x="${f[0]}" data-z="${f[1]}"><b>${f[3]}</b>`+
+      `<span>${f[0].toFixed(0)}, ${f[1].toFixed(0)} · Y ${f[2].toFixed(0)}</span>`+
+      `<span>${tx}_${ty} ${g}${f[5]?' · '+ZN(f[5]):''}</span>`+
+      `<span>${grpName(catOf(f[3]))}</span><u>→</u></div>`;}).join('');
+  box.querySelectorAll('.rr').forEach(r=>r.onclick=()=>goto(+r.dataset.x,+r.dataset.z));}
+function goto(x,z){
+  const q=w2i(x,z);
+  S.view.x=q[0]-cv.width/(2*S.view.k);S.view.y=q[1]-cv.height/(2*S.view.k);
+  draw();renderRes();}
+
+/* ---------- ui ---------- */
+const logMin=Math.log(0.5),logMax=Math.log(4096);
+const sFromSlider=v=>Math.exp(logMin+(logMax-logMin)*v/1000);
+const sliderFromS=s=>Math.round(1000*(Math.log(s)-logMin)/(logMax-logMin));
+function syncUI(){
+  $('sS').value=sliderFromS(S.s);$('nS').value=+S.s.toFixed(6);
+  $('sX').value=Math.round(S.ox);$('nX').value=+S.ox.toFixed(2);
+  $('sZ').value=Math.round(S.oz);$('nZ').value=+S.oz.toFixed(2);
+  $('flip').checked=S.fz<0;$('pV').textContent=$('dSize').value;
+  $('calInfo').innerHTML=(512/S.s).toFixed(2)+' пкс/тайл · '+(TZ/S.s).toFixed(2)+' пкс/ряд';
+  draw();updHud();}
+$('sS').oninput=e=>{S.s=sFromSlider(+e.target.value);syncUI();};
+$('sX').oninput=e=>{S.ox=+e.target.value;syncUI();};
+$('sZ').oninput=e=>{S.oz=+e.target.value;syncUI();};
+$('flip').onchange=e=>{S.fz=e.target.checked?-1:1;syncUI();};
+$('nS').onchange=e=>{S.s=+e.target.value||S.s;syncUI();};
+$('nX').onchange=e=>{S.ox=+e.target.value;syncUI();};
+$('nZ').onchange=e=>{S.oz=+e.target.value;syncUI();};
+$('dSize').oninput=syncUI;
+['dTiles','dCells','dAll','dFound','dPlayers'].forEach(id=>$(id).onchange=draw);
+function syncGridBtn(){$('bSwap').textContent=tr(S.gswap?'order_v':'order_h');}
+$('bSwap').onclick=()=>{S.gswap=!S.gswap;syncGridBtn();draw();};
+$('bSide').onclick=()=>{const h=$('app').classList.toggle('nos');
+  $('bSide').title=tr(h?'tt_show':'tt_hide');resize();};
+$('bSide').title=tr('tt_hide');
+$('lang').onchange=e=>{LANG=e.target.value;
+  try{localStorage.setItem('am_lang',LANG);}catch(err){}
+  applyLang();};
+$('q').oninput=$('qx').oninput=$('src').onchange=rebuild;
+function markSel(set,top){
+  S.sel=new Set(top?S.rows.slice(0,top).map(r=>r[0]):set);
+  $('names').querySelectorAll('input').forEach(c=>c.checked=S.sel.has(+c.dataset.id));
+  recalc();}
+$('bAll').onclick=()=>markSel(S.rows.map(r=>r[0]));
+$('bNone').onclick=()=>markSel([]);
+$('bTop').onclick=()=>markSel(null,20);
+$('bReset').onclick=()=>{S.s=DEF.s;S.ox=DEF.ox;S.oz=DEF.oz;S.fz=DEF.fz;syncUI();};
+$('bFit').onclick=()=>{if(S.img)fitSave();};
+function fitSave(){
+  const w=IDX.x1-IDX.x0||6000,h=IDX.z1-IDX.z0||6000;
+  const k=Math.min(cv.width/(w/S.s*1.15), cv.height/(h/S.s*1.15), 4);
+  S.view.k=k;
+  const c=w2i((IDX.x0+IDX.x1)/2,(IDX.z0+IDX.z1)/2);
+  S.view.x=c[0]-cv.width/(2*k);S.view.y=c[1]-cv.height/(2*k);
+  draw();renderRes();}
+
+$('bCsv').onclick=()=>{
+  const lines=[tr('csv_head')+';category;display_name'];
+  for(const f of S.found){
+    const [tx,ty]=worldToTile(f[0],f[1]);const q=w2i(f[0],f[1]);
+    lines.push([f[3],f[0].toFixed(1),f[1].toFixed(1),f[2].toFixed(1),tx+'_'+ty,
+                pixelToGrid(q[0],q[1])||'',SRCNAME(f[4]),ZN(f[5])||tr('surface'),
+                grpName(catOf(f[3])),dispName(f[3])].join(';'));}
+  const t=lines.join('\n');
+  $('csv').style.display='block';$('csv').value=t;
+  const b=new Blob([t],{type:'text/csv'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(b);a.download='found.csv';a.click();
+  $('hint').textContent=tr('hint_csv',{n:S.found.length});};
+$('bList').onclick=renderRes;
+
+$('bGo').onclick=()=>{
+  const g=gridParse($('gq').value);
+  if(!g){$('hint').textContent=tr('fmt_sq');return;}
+  const [col,row]=g, ih=S.img?S.img.height:4096;
+  S.view.k=1.2;S.view.x=col*256-cv.width/(2*S.view.k)+128;
+  S.view.y=(ih-row*256-256)-cv.height/(2*S.view.k)+128;draw();};
+$('bGoT').onclick=()=>{
+  const m=$('tq').value.trim().match(/^(-?\d+)[_\s]+(-?\d+)$/);
+  if(!m){$('hint').textContent=tr('fmt_tile');return;}
+  const c=tileCenter(+m[1],+m[2]);goto(c[0],c[1]);};
+$('bGoW').onclick=()=>{const x=+$('wx').value,z=+$('wz').value;
+  if(isFinite(x)&&isFinite(z))goto(x,z);};
+
+/* files */
+$('dropMap').onclick=()=>$('fMap').click();
+$('dropSave').onclick=()=>$('fSave').click();
+$('fMap').onchange=e=>{if(e.target.files[0])loadMap(e.target.files[0]);};
+$('fSave').onchange=e=>{if(e.target.files[0])loadSave(e.target.files[0]);};
+[['dropMap','fMap'],['dropSave','fSave']].forEach(([d])=>{
+  const el=$(d);
+  ['dragenter','dragover'].forEach(ev=>el.addEventListener(ev,e=>{e.preventDefault();el.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>el.addEventListener(ev,e=>{e.preventDefault();el.classList.remove('over');}));
+  el.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(!f)return;
+    if(/tiles|\.zip|\.pdf/i.test(f.name)&&d==='dropSave')loadSave(f);
+    else if(d==='dropSave'&&/zip|pdf/i.test(f.type+f.name))loadSave(f);
+    else loadMap(f);});});
+function setImg(im,name){
+  S.img=im;S.mapName=name;S.mapTried=true;mapZone();
+  S.view={x:0,y:0,k:Math.min(cv.width/im.width,cv.height/im.height)};
+  if(IDX.total)fitSave();
+  syncUI();}
+function loadMap(f){
+  const url=URL.createObjectURL(f),im=new Image();
+  im.onload=()=>setImg(im,f.name);
+  im.src=url;}
+/* карта не процедурная — лежит рядом и подхватывается сама */
+function autoMap(){
+  const im=new Image();
+  im.onload=()=>setImg(im,'worldmap.png');
+  im.onerror=()=>{S.mapTried=true;mapZone();};
+  im.src='worldmap.png';}
+
+/* mouse */
+cv.addEventListener('mousedown',e=>{const r=cv.getBoundingClientRect();
+  S.drag={sx:e.clientX-r.left,sy:e.clientY-r.top,vx:S.view.x,vy:S.view.y};});
+window.addEventListener('mouseup',()=>S.drag=null);
+cv.addEventListener('mousemove',e=>{
+  const r=cv.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
+  if(S.drag){S.view.x=S.drag.vx-(sx-S.drag.sx)/S.view.k;
+             S.view.y=S.drag.vy-(sy-S.drag.sy)/S.view.k;draw();}
+  if(S.img){S.hover=toImage(sx,sy);updHud();showTip(sx,sy);}});
+cv.addEventListener('wheel',e=>{if(!S.img)return;e.preventDefault();
+  const r=cv.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
+  const b=toImage(sx,sy);
+  S.view.k=Math.max(0.02,Math.min(80,S.view.k*Math.exp(-e.deltaY*0.0015)));
+  const a=toImage(sx,sy);
+  S.view.x+=b[0]-a[0];S.view.y+=b[1]-a[1];draw();},{passive:false});
+
+function showTip(sx,sy){
+  const tip=$('tip');
+  if(!S.found.length||!$('dFound').checked){tip.style.display='none';return;}
+  const R=(+$('dSize').value)+3;
+  let best=null,bd=R*R;
+  for(const f of S.found){
+    const q=w2i(f[0],f[1]);
+    const px=(q[0]-S.view.x)*S.view.k, py=(q[1]-S.view.y)*S.view.k;
+    if(px<-20||py<-20||px>cv.width+20||py>cv.height+20)continue;
+    const d=(px-sx)**2+(py-sy)**2;
+    if(d<bd){bd=d;best=f;}}
+  if(!best){tip.style.display='none';return;}
+  tip.style.display='block';tip.style.left=(sx+14)+'px';tip.style.top=(sy+14)+'px';
+  const [tx,ty]=worldToTile(best[0],best[1]);
+  tip.innerHTML=`<b style="color:var(--hot)">${best[3]}</b>`+
+    (dispName(best[3])!==best[3]?` <span style="color:var(--dim)">${dispName(best[3])}</span>`:'')+
+    ` · ${SRCNAME(best[4])} · ${grpName(catOf(best[3]))}<br>`+
+    `X ${best[0].toFixed(0)}  Z ${best[1].toFixed(0)}  Y ${best[2].toFixed(0)}<br>`+
+    `${tr('hud_tile')} ${tx}_${ty}`+
+    (best[5]?'<br>'+tr('in_dungeon',{n:best[5]}):'')+
+    (best[4]==='component'||best[4]==='stored'?'<br><i>'+tr('in_veh')+'</i>':'');}
+
+window.addEventListener('resize',resize);
+loadPrefs();
+resize();applyLang();
+$('hint').textContent=tr('hint_start');
+autoMap();
+</script>
+</body>
+</html>
