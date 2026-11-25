@@ -1,0 +1,1 @@
+convert -depth 8 -size 4096x4096+24 rgba:map_lines.txtr map_lines.png
